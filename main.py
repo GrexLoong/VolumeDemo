@@ -4,20 +4,48 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
+import subprocess
 import sys
 from typing import Optional
 
 # Disable Kivy CLI parsing so application-specific args (e.g. --mock) work directly.
 os.environ.setdefault("KIVY_NO_ARGS", "1")
 
-from kivy.app import App
-from kivy.clock import Clock
-from kivy.core.window import Window
-from kivy.metrics import dp
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.button import Button
-from kivy.uix.label import Label
-from kivy.utils import platform
+try:
+    from kivy.app import App
+    from kivy.clock import Clock
+    from kivy.core.window import Window
+    from kivy.metrics import dp
+    from kivy.uix.boxlayout import BoxLayout
+    from kivy.uix.button import Button
+    from kivy.uix.label import Label
+    from kivy.utils import platform
+except ModuleNotFoundError as exc:
+    if exc.name != "kivy":
+        raise
+
+    # Auto-bootstrap into the project conda env so users can run from base shell.
+    if os.environ.get("VOLUME_DEMO_BOOTSTRAPPED") != "1":
+        conda_cmd = shutil.which("conda")
+        if conda_cmd:
+            env = os.environ.copy()
+            env["VOLUME_DEMO_BOOTSTRAPPED"] = "1"
+            cmd = [
+                conda_cmd,
+                "run",
+                "-n",
+                "voldemo",
+                "python",
+                os.path.abspath(__file__),
+                *sys.argv[1:],
+            ]
+            raise SystemExit(subprocess.call(cmd, env=env))
+
+    print(
+        "Missing dependency: kivy. Please run: conda activate voldemo; pip install -r requirements.txt"
+    )
+    raise SystemExit(1)
 
 from waveform.audio_source import AudioSource, build_audio_source
 from waveform.constants import BACKGROUND_RGBA
@@ -179,11 +207,21 @@ class WaveformApp(App):
 
     def _update_status_ui(self) -> None:
         if self._toggle_button is not None:
-            self._toggle_button.text = self._ui_text("停止录音", "Stop") if self._is_running else self._ui_text("开始录音", "Start")
+            self._toggle_button.text = (
+                self._ui_text("停止录音", "Stop")
+                if self._is_running
+                else self._ui_text("开始录音", "Start")
+            )
         if self._status_label is not None:
             mode = "Mock" if self._use_mock or platform != "android" else "Mic"
-            status = self._ui_text("录音中", "Recording") if self._is_running else self._ui_text("已停止", "Stopped")
-            self._status_label.text = self._ui_text("状态", "Status") + f": {status} ({mode})"
+            status = (
+                self._ui_text("录音中", "Recording")
+                if self._is_running
+                else self._ui_text("已停止", "Stopped")
+            )
+            self._status_label.text = (
+                self._ui_text("状态", "Status") + f": {status} ({mode})"
+            )
 
     def _update_hud(self, dt: float) -> None:
         if self._is_running:
