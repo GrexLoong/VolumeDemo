@@ -5,7 +5,7 @@
 ## 1. 已实现内容
 
 1. Kivy 工程骨架与依赖声明
-2. 波形组件 `WaveformWidget`（右向左滚动、圆角矩形条、EMA 平滑）
+2. 波形组件 `WaveformWidget`（右向左匀速滚动、圆角胶囊条、固定间距）
 3. 数据源抽象与双实现：`MockSource` + `MicrophoneSource`
 4. 应用入口 `main.py`，支持 `--mock` 模式
 5. Android 打包起始配置 `buildozer.spec`（含 `RECORD_AUDIO` 权限）
@@ -18,18 +18,20 @@
   - 负责尺寸、颜色、帧率、音频参数等统一常量
 - `waveform/audio_source.py`
   - `AudioSource` 协议定义
-  - `MockSource`：正弦 + 噪声模拟语音能量
+  - `MockSource`：说话段/静默段包络 + attack/release 平滑
   - `MicrophoneSource`：pyjnius 调用 Android `AudioRecord` 并计算 RMS
 - `waveform/widget.py`
-  - 预创建固定数量的 `RoundedRectangle`
-  - 每帧只更新 `pos/size`，避免 `clear+redraw` 的对象重建
-  - 对高度应用 EMA 平滑，提升动画丝滑度
+  - 新音柱从最右侧生成，所有音柱匀速整体左移
+  - 音柱间距固定 6dp，不随音量变化
+  - 音柱高度在 12dp~58dp 映射，宽度在 3dp~4dp 随高度联动
+  - 音柱生成后高度冻结，仅位置随时间移动
 
 ## 3. 关键实现决策
 
 1. 使用 `deque(maxlen)` 保存波形窗口，实现 O(1) 右入左出
 2. 采用 `Clock.schedule_interval(..., 1/60)` 驱动渲染循环
-3. 音频采样频率与渲染频率解耦：麦克风 25Hz、Mock 14Hz，通过 EMA 平滑桥接
+3. 音频采样与渲染解耦：麦克风采样维持实时，渲染统一 60fps
+4. 波形滚动采用“固定速度 + 固定间距 + 右侧生成”时序模型
 4. Android 麦克风失败时自动回退到 Mock 模式，确保始终可演示
 
 ## 4. 本地运行步骤（Conda）
@@ -70,5 +72,6 @@
 可在以下常量直接调节观感：
 
 1. `waveform/constants.py` 中 `MOCK_SAMPLE_FPS`：控制每秒新增波形条数量（越小越慢）
-2. `waveform/constants.py` 中 `MOCK_NOISE_RANGE`：控制随机抖动强度
-3. `waveform/constants.py` 中 `MOCK_BASE_FREQ_HZ`、`MOCK_DETAIL_FREQ_HZ`：控制波形节奏快慢
+2. `waveform/constants.py` 中 `SCROLL_SPEED_DP_PER_SEC`：控制整体左移速度
+3. `waveform/constants.py` 中 `MOCK_SPEAK_*` 和 `MOCK_SILENCE_*`：控制说话/停顿起伏幅度
+4. `waveform/constants.py` 中 `MOCK_ATTACK_ALPHA`、`MOCK_RELEASE_ALPHA`：控制抗闪烁与响应速度
