@@ -45,6 +45,7 @@ class WaveformWidget(Widget):
         self._amplitudes = amplitudes
         self._bars: List[BarItem] = []
         self._spawn_accumulator = 0.0
+        self._last_widget_x = self.x
 
         # Device-pixel values cached from dp constants.
         self._bar_min_width = to_dp(BAR_MIN_WIDTH_DP)
@@ -65,20 +66,19 @@ class WaveformWidget(Widget):
             Color(*BAR_RGBA)
 
         self.bind(pos=self._on_layout_change, size=self._on_layout_change)
-        Clock.schedule_once(lambda _dt: self._rebuild_bars(), 0)
         Clock.schedule_interval(self.update_frame, 1.0 / RENDER_FPS)
 
     def _on_layout_change(self, *_args) -> None:
         self._bg_rect.pos = self.pos
         self._bg_rect.size = self.size
-        self._rebuild_bars()
 
-    def _rebuild_bars(self) -> None:
-        # Drop previous instructions when layout changes.
-        for bar in self._bars:
-            self.canvas.remove(bar.rect)
-        self._bars.clear()
-        self._spawn_accumulator = 0.0
+        # Preserve already generated bars when the widget moves/resizes.
+        dx = self.x - self._last_widget_x
+        if dx != 0.0:
+            for bar in self._bars:
+                bar.x += dx
+                bar.rect.pos = (bar.x, bar.rect.pos[1])
+        self._last_widget_x = self.x
 
     def _container_center_y(self) -> float:
         return self.y + self.height * 0.5

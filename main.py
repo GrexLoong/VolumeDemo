@@ -24,6 +24,22 @@ from waveform.constants import BACKGROUND_RGBA
 from waveform.widget import WaveformWidget, create_default_buffer
 
 
+def _resolve_ui_font() -> Optional[str]:
+    """Return a CJK-capable font path when available, else None."""
+    if platform != "win":
+        return None
+
+    candidates = [
+        r"C:\Windows\Fonts\msyh.ttc",
+        r"C:\Windows\Fonts\msyhbd.ttc",
+        r"C:\Windows\Fonts\simhei.ttf",
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return None
+
+
 def _request_android_mic_permission() -> None:
     """Ask for microphone permission at runtime on Android 6.0+ devices."""
     if platform != "android":
@@ -45,14 +61,25 @@ class WaveformApp(App):
         self._use_mock = use_mock
         self._source: Optional[AudioSource] = None
         self._is_running = False
+        self._elapsed_seconds = 0.0
         self._waveform: Optional[WaveformWidget] = None
         self._status_label: Optional[Label] = None
         self._fps_label: Optional[Label] = None
+        self._timer_label: Optional[Label] = None
         self._toggle_button: Optional[Button] = None
+        self._ui_font: Optional[str] = None
+        self._ascii_ui = False
         self._fps_event = None
+
+    def _ui_text(self, zh: str, en: str) -> str:
+        """Use Chinese text when a CJK-capable font exists, else ASCII fallback."""
+        return en if self._ascii_ui else zh
 
     def build(self) -> BoxLayout:
         Window.clearcolor = BACKGROUND_RGBA
+        self._ui_font = _resolve_ui_font()
+        self._ascii_ui = self._ui_font is None
+
         buffer = create_default_buffer(Window.width)
         self._waveform = WaveformWidget(amplitudes=buffer)
 
@@ -67,10 +94,20 @@ class WaveformApp(App):
             orientation="horizontal", size_hint_y=None, height=dp(44), spacing=dp(8)
         )
 
-        self._toggle_button = Button(text="开始录音", size_hint_x=None, width=dp(120))
+        self._toggle_button = Button(
+            text=self._ui_text("开始录音", "Start"),
+            size_hint_x=None,
+            width=dp(120),
+            font_name=self._ui_font,
+        )
         self._toggle_button.bind(on_release=self._on_toggle_pressed)
 
-        self._status_label = Label(text="状态: 已停止", halign="left", valign="middle")
+        self._status_label = Label(
+            text=self._ui_text("状态: 已停止", "Status: Stopped"),
+            halign="left",
+            valign="middle",
+            font_name=self._ui_font,
+        )
         self._status_label.bind(
             size=lambda inst, _v: setattr(inst, "text_size", inst.size)
         )
@@ -81,20 +118,34 @@ class WaveformApp(App):
             width=dp(90),
             halign="right",
             valign="middle",
+            font_name=self._ui_font,
         )
         self._fps_label.bind(
             size=lambda inst, _v: setattr(inst, "text_size", inst.size)
         )
 
+        self._timer_label = Label(
+            text=self._ui_text("时长: 00:00", "Time: 00:00"),
+            size_hint_x=None,
+            width=dp(120),
+            halign="right",
+            valign="middle",
+            font_name=self._ui_font,
+        )
+        self._timer_label.bind(
+            size=lambda inst, _v: setattr(inst, "text_size", inst.size)
+        )
+
         header.add_widget(self._toggle_button)
         header.add_widget(self._status_label)
+        header.add_widget(self._timer_label)
         header.add_widget(self._fps_label)
         root.add_widget(header)
         root.add_widget(self._waveform)
 
         # Delay source startup until the first frame to avoid startup race with UI init.
         Clock.schedule_once(lambda _dt: self._start_source(), 0)
-        self._fps_event = Clock.schedule_interval(self._update_fps, 0.5)
+        self._fps_event = Clock.schedule_interval(self._update_hud, 0.2)
         return root
 
     def _on_toggle_pressed(self, _instance: Button) -> None:
@@ -106,6 +157,7 @@ class WaveformApp(App):
     def _start_source(self) -> None:
         if self._source is None or self._is_running:
             return
+        self._elapsed_seconds = 0.0
         try:
             self._source.start()
         except Exception:
@@ -127,13 +179,23 @@ class WaveformApp(App):
 
     def _update_status_ui(self) -> None:
         if self._toggle_button is not None:
-            self._toggle_button.text = "停止录音" if self._is_running else "开始录音"
+            self._toggle_button.text = self._ui_text("停止录音", "Stop") if self._is_running else self._ui_text("开始录音", "Start")
         if self._status_label is not None:
             mode = "Mock" if self._use_mock or platform != "android" else "Mic"
-            status = "录音中" if self._is_running else "已停止"
-            self._status_label.text = f"状态: {status} ({mode})"
+            status = self._ui_text("录音中", "Recording") if self._is_running else self._ui_text("已停止", "Stopped")
+            self._status_label.text = self._ui_text("状态", "Status") + f": {status} ({mode})"
 
-    def _update_fps(self, _dt: float) -> None:
+    def _update_hud(self, dt: float) -> None:
+        if self._is_running:
+            self._elapsed_seconds += dt
+
+        if self._timer_label is not None:
+            total = int(self._elapsed_seconds)
+            minutes = total // 60
+            seconds = total % 60
+            prefix = self._ui_text("时长", "Time")
+            self._timer_label.text = f"{prefix}: {minutes:02d}:{seconds:02d}"
+
         if self._fps_label is None:
             return
         self._fps_label.text = f"FPS: {Clock.get_fps():.1f}"

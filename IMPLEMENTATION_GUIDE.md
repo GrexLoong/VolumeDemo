@@ -80,3 +80,17 @@
 2. `waveform/constants.py` 中 `SCROLL_SPEED_DP_PER_SEC`：控制整体左移速度
 3. `waveform/constants.py` 中 `MOCK_SPEAK_*` 和 `MOCK_SILENCE_*`：控制说话/停顿起伏幅度
 4. `waveform/constants.py` 中 `MOCK_ATTACK_ALPHA`、`MOCK_RELEASE_ALPHA`：控制抗闪烁与响应速度
+
+## 9. 已修复问题（2026-03-11）
+
+1. UI 文本乱码方块
+  - 修复点：在 `main.py` 增加字体检测（Windows 优先使用 `msyh.ttc` / `simhei.ttf`），并在无 CJK 字体时自动回退到英文 UI 文本，避免按钮和状态文字变成方块。
+  - 影响范围：开始/停止按钮、状态文本、录音时长文本、FPS 文本。
+
+2. 窗口操作导致波形破坏
+  - 修复点：在 `waveform/widget.py` 中移除窗口变化时的重建/清空逻辑，改为保留历史音柱数据；当组件位置变化时仅做 x 方向坐标补偿。
+  - 行为保证：已生成音柱不会因窗口移动/缩放被重置，只继续随时间匀速左移。
+
+3. 录音时长显示补齐
+  - 修复点：在 `main.py` 增加时长 HUD（`mm:ss`），与开始/停止状态联动。
+  - 验证方式：点击开始后时长递增，点击停止后时长停止更新。
