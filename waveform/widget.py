@@ -87,7 +87,9 @@ class WaveformWidget(Widget):
         amp = max(0.0, min(1.0, amplitude))
 
         # Height follows strict 12dp~58dp range.
-        target_h = self._bar_min_height + amp * (self._bar_max_height - self._bar_min_height)
+        target_h = self._bar_min_height + amp * (
+            self._bar_max_height - self._bar_min_height
+        )
 
         # Keep vertical safety margin if container is temporarily too short.
         available_h = max(0.0, self.height - self._vertical_padding * 2.0)
