@@ -311,6 +311,16 @@ class WaveformApp(App):
         if self._source is not None and self._is_running:
             self._source.stop()
 
+    def on_pause(self) -> bool:
+        # Halt recording and animation when the app is backgrounded to save resources.
+        if self._is_running:
+            self._stop_source()
+        return True
+
+    def on_resume(self) -> None:
+        # Upon returning to the foreground, remain in the paused state to let the user manually resume.
+        pass
+
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     """CLI options: support mock mode for non-Android and CI validation."""
