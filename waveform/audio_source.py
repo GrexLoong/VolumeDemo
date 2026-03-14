@@ -174,7 +174,7 @@ class MicrophoneSource:
 
         AudioRecord = autoclass("android.media.AudioRecord")
         AudioFormat = autoclass("android.media.AudioFormat")
-        MediaRecorder = autoclass("android.media.MediaRecorder")
+        MediaRecorder_AudioSource = autoclass("android.media.MediaRecorder$AudioSource")
 
         channel = AudioFormat.CHANNEL_IN_MONO
         encoding = AudioFormat.ENCODING_PCM_16BIT
@@ -183,7 +183,7 @@ class MicrophoneSource:
             raise RuntimeError("AudioRecord.getMinBufferSize returned invalid size")
 
         self._recorder = AudioRecord(
-            MediaRecorder.AudioSource.MIC,
+            MediaRecorder_AudioSource.MIC,
             SAMPLE_RATE,
             channel,
             encoding,

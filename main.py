@@ -266,13 +266,12 @@ class WaveformApp(App):
         self._elapsed_seconds = 0.0
         try:
             self._source.start()
-        except Exception:
-            # If mic source startup fails, fallback to mock mode automatically.
-            fallback = build_audio_source(
-                use_mock=True, amplitudes=self._source.get_buffer()
-            )
-            self._source = fallback
-            self._source.start()
+        except Exception as e:
+            if self._timer_label:
+                self._timer_label.font_size = "14sp"
+                self._timer_label.text = f"MIC ERROR: {str(e)[:50]}"
+            return
+
         self._is_running = True
         if self._waveform:
             self._waveform.is_recording = True
