@@ -30,8 +30,9 @@ jobs:
 
       - name: Build with Buildozer
         # 这一步需要较长时间（可能会耗时10-15分钟），请耐心等待
+        # 使用 yes 命令自动同意所有的 Android SDK 许可协议
         run: |
-          buildozer android debug
+          yes | buildozer android debug
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
