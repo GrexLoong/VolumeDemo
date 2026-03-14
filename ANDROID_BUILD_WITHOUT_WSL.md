@@ -29,6 +29,27 @@
    - 在页面最下方的 **`Artifacts`** 区域，会看到一个名为 **`VolumeDemo-Android-APK`** 的压缩包。
    - 下载并解压该 zip 文件，里面就是可以安装在手机上的 `xxxxx-debug.apk`。
 
+### 🔴 如果遇到红色叉叉（打包失败）该怎么办？
+
+红色的叉叉表示云端的打包任务遇到了错误并停止了运行。因为 Android 打包涉及数千个文件的编译，任何一点环境不匹配都可能导致失败。请按以下详尽步骤排查：
+
+1. **进入错误日志详情**：
+   - 在 `Actions` 页面，点击那个红色的 `Android Build with Buildozer` 任务名称。
+   - 左侧边栏会有一个列出步骤的列表，点击红色的 `build-android`。
+   - 此时右侧会展开一个命令行黑色窗口。向下滚动，找到带红叉的那一步（通常是 `Build with Buildozer` 这一步）。
+
+2. **展开报错详情并截图/复制**：
+   - 点击这一步右侧的小箭头（`>`）展开详细的运行日志。
+   - 滚动到日志的 **最底部**（通常最后 20-50 行包含了最关键的报错原因，例如：`Command failed: ...`，或者 `ModuleNotFoundError` 等）。
+   - 将最底部带有 `Error` 关键词的那段报错截图，或者直接将这段文本原封不动地复制发给我。
+
+3. **最常见的几种报错及一键排查思路**（供参考，最好还是发日志给我）：
+   - **Cython 版本不匹配**：如果看到 `ValueError: numpy.ndarray size changed` 或 `cython` 相关的编译错误，我们在 `buildozer.spec` 中限制一下 Cython 的版本即可。
+   - **缺少第三方 Python 库**：如果你在代码中 `import` 了额外的库，但没有在 `buildozer.spec` 的 `requirements = xxx` 中声明，就会报错。
+   - **平台架构错误 / NDK 下载失败**：有时候是由于微软服务器网络波动导致 Android NDK 没下载全，这种情况下可以在 GitHub Actions 页面右上角点击 **`Re-run all jobs`**（重新运行一次试试运气）。
+
+**下一步操作**：请您直接把那段报错信息发给我，我将马上为您修改相关配置，您只需在我修改后重新 `git push` 一次即可。
+
 ---
 
 ## 方案二：使用 Google Colab 白嫖云算力打包（备选方案）
