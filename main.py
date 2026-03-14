@@ -13,13 +13,18 @@ from typing import Optional
 os.environ.setdefault("KIVY_NO_ARGS", "1")
 
 try:
+    from kivy.animation import Animation
     from kivy.app import App
     from kivy.clock import Clock
     from kivy.core.window import Window
+    from kivy.graphics import Color, Ellipse, Line, RoundedRectangle
     from kivy.metrics import dp
+    from kivy.uix.anchorlayout import AnchorLayout
+    from kivy.uix.behaviors import ButtonBehavior
     from kivy.uix.boxlayout import BoxLayout
-    from kivy.uix.button import Button
+    from kivy.uix.floatlayout import FloatLayout
     from kivy.uix.label import Label
+    from kivy.uix.widget import Widget
     from kivy.utils import platform
 except ModuleNotFoundError as exc:
     if exc.name != "kivy":
@@ -81,6 +86,103 @@ def _request_android_mic_permission() -> None:
         pass
 
 
+class RecordButton(ButtonBehavior, Widget):
+    """Custom iOS-style recording button."""
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        from waveform.constants import BTN_OUTER_RADIUS_DP
+
+        self.size_hint = (None, None)
+        side = dp(BTN_OUTER_RADIUS_DP * 2 + 4)
+        self.size = (side, side)
+
+        self.is_recording = False
+        self._animating = False
+
+        with self.canvas:
+            Color(1, 1, 1, 1)
+            self.outer_line = Line(
+                circle=(self.center_x, self.center_y, dp(BTN_OUTER_RADIUS_DP)),
+                width=dp(2.5),
+            )
+
+            Color(1, 0.23, 0.19, 1)
+            from waveform.constants import BTN_INNER_IDLE_RADIUS_DP
+
+            radius = dp(BTN_INNER_IDLE_RADIUS_DP)
+            self.inner_shape = RoundedRectangle(
+                pos=(self.center_x - radius, self.center_y - radius),
+                size=(radius * 2, radius * 2),
+                radius=[
+                    (radius, radius),
+                    (radius, radius),
+                    (radius, radius),
+                    (radius, radius),
+                ],
+            )
+
+        self.bind(pos=self.update_canvas, size=self.update_canvas)
+
+    def update_canvas(self, *_args) -> None:
+        from waveform.constants import (
+            BTN_OUTER_RADIUS_DP,
+            BTN_INNER_IDLE_RADIUS_DP,
+            BTN_INNER_REC_SIZE_DP,
+        )
+
+        self.outer_line.circle = (self.center_x, self.center_y, dp(BTN_OUTER_RADIUS_DP))
+
+        if not self._animating:
+            if self.is_recording:
+                s = dp(BTN_INNER_REC_SIZE_DP)
+            else:
+                s = dp(BTN_INNER_IDLE_RADIUS_DP * 2)
+
+            self.inner_shape.pos = (self.center_x - s * 0.5, self.center_y - s * 0.5)
+            self.inner_shape.size = (s, s)
+
+    def set_recording_state(self, is_recording: bool) -> None:
+        if getattr(self, "inner_shape", None) is None:
+            return
+
+        self.is_recording = is_recording
+        self._animating = True
+
+        from waveform.constants import (
+            BTN_INNER_IDLE_RADIUS_DP,
+            BTN_INNER_REC_SIZE_DP,
+            BTN_INNER_REC_RADIUS_DP,
+        )
+
+        if is_recording:
+            r = dp(BTN_INNER_REC_RADIUS_DP)
+            target_size = dp(BTN_INNER_REC_SIZE_DP)
+            target_radius = [(r, r), (r, r), (r, r), (r, r)]
+        else:
+            r = dp(BTN_INNER_IDLE_RADIUS_DP)
+            target_size = dp(BTN_INNER_IDLE_RADIUS_DP * 2)
+            target_radius = [(r, r), (r, r), (r, r), (r, r)]
+
+        target_pos = (
+            self.center_x - target_size * 0.5,
+            self.center_y - target_size * 0.5,
+        )
+
+        anim = Animation(
+            pos=target_pos,
+            size=(target_size, target_size),
+            radius=target_radius,
+            d=0.25,
+            t="out_quad",
+        )
+        anim.on_complete = self._on_anim_complete
+        anim.start(self.inner_shape)
+
+    def _on_anim_complete(self, *_args) -> None:
+        self._animating = False
+
+
 class WaveformApp(App):
     """Main Kivy app that wires source data into the waveform widget."""
 
@@ -103,7 +205,7 @@ class WaveformApp(App):
         """Use Chinese text when a CJK-capable font exists, else ASCII fallback."""
         return en if self._ascii_ui else zh
 
-    def build(self) -> BoxLayout:
+    def build(self) -> Widget:
         Window.clearcolor = BACKGROUND_RGBA
         self._ui_font = _resolve_ui_font()
         self._ascii_ui = self._ui_font is None
@@ -116,67 +218,43 @@ class WaveformApp(App):
 
         self._source = build_audio_source(use_mock=self._use_mock, amplitudes=buffer)
 
-        # Build a simple control bar for start/stop and runtime diagnostics.
-        root = BoxLayout(orientation="vertical", spacing=dp(8), padding=[dp(10)] * 4)
-        header = BoxLayout(
-            orientation="horizontal", size_hint_y=None, height=dp(44), spacing=dp(8)
-        )
+        root = FloatLayout()
 
-        self._toggle_button = Button(
-            text=self._ui_text("开始录音", "Start"),
-            size_hint_x=None,
-            width=dp(120),
-            font_name=self._ui_font,
-        )
-        self._toggle_button.bind(on_release=self._on_toggle_pressed)
-
-        self._status_label = Label(
-            text=self._ui_text("状态: 已停止", "Status: Stopped"),
-            halign="left",
-            valign="middle",
-            font_name=self._ui_font,
-        )
-        self._status_label.bind(
-            size=lambda inst, _v: setattr(inst, "text_size", inst.size)
-        )
-
-        self._fps_label = Label(
-            text="FPS: --",
-            size_hint_x=None,
-            width=dp(90),
-            halign="right",
-            valign="middle",
-            font_name=self._ui_font,
-        )
-        self._fps_label.bind(
-            size=lambda inst, _v: setattr(inst, "text_size", inst.size)
-        )
+        # High contrast, large timer label at the top.
+        from waveform.constants import TIMER_FONT_SIZE_DP
 
         self._timer_label = Label(
-            text=self._ui_text("时长: 00:00", "Time: 00:00"),
-            size_hint_x=None,
-            width=dp(120),
-            halign="right",
+            text="00:00.00",
+            font_size=dp(TIMER_FONT_SIZE_DP),
+            bold=True,
+            halign="center",
             valign="middle",
-            font_name=self._ui_font,
-        )
-        self._timer_label.bind(
-            size=lambda inst, _v: setattr(inst, "text_size", inst.size)
+            size_hint=(None, None),
+            size=(dp(300), dp(100)),
+            pos_hint={"center_x": 0.5, "top": 0.9},
         )
 
-        header.add_widget(self._toggle_button)
-        header.add_widget(self._status_label)
-        header.add_widget(self._timer_label)
-        header.add_widget(self._fps_label)
-        root.add_widget(header)
-        root.add_widget(self._waveform)
+        # Big center layout for waveform container
+        wave_container = BoxLayout(
+            orientation="vertical",
+            size_hint=(1.0, None),
+            height=dp(200),
+            pos_hint={"center_x": 0.5, "center_y": 0.55},
+        )
+        wave_container.add_widget(self._waveform)
 
-        # Delay source startup until the first frame to avoid startup race with UI init.
-        Clock.schedule_once(lambda _dt: self._start_source(), 0)
-        self._fps_event = Clock.schedule_interval(self._update_hud, 0.2)
+        # Bottom circular record button.
+        self._toggle_button = RecordButton(pos_hint={"center_x": 0.5, "y": 0.1})
+        self._toggle_button.bind(on_release=self._on_toggle_pressed)
+
+        root.add_widget(self._timer_label)
+        root.add_widget(wave_container)
+        root.add_widget(self._toggle_button)
+
+        self._fps_event = Clock.schedule_interval(self._update_hud, 0.05)
         return root
 
-    def _on_toggle_pressed(self, _instance: Button) -> None:
+    def _on_toggle_pressed(self, _instance) -> None:
         if self._is_running:
             self._stop_source()
         else:
@@ -196,6 +274,8 @@ class WaveformApp(App):
             self._source = fallback
             self._source.start()
         self._is_running = True
+        if self._waveform:
+            self._waveform.is_recording = True
         self._update_status_ui()
 
     def _stop_source(self) -> None:
@@ -203,40 +283,26 @@ class WaveformApp(App):
             return
         self._source.stop()
         self._is_running = False
+        if self._waveform:
+            self._waveform.is_recording = False
         self._update_status_ui()
 
     def _update_status_ui(self) -> None:
-        if self._toggle_button is not None:
-            self._toggle_button.text = (
-                self._ui_text("停止录音", "Stop")
-                if self._is_running
-                else self._ui_text("开始录音", "Start")
-            )
-        if self._status_label is not None:
-            mode = "Mock" if self._use_mock or platform != "android" else "Mic"
-            status = (
-                self._ui_text("录音中", "Recording")
-                if self._is_running
-                else self._ui_text("已停止", "Stopped")
-            )
-            self._status_label.text = (
-                self._ui_text("状态", "Status") + f": {status} ({mode})"
-            )
+        if self._toggle_button is not None and hasattr(
+            self._toggle_button, "set_recording_state"
+        ):
+            self._toggle_button.set_recording_state(self._is_running)
 
     def _update_hud(self, dt: float) -> None:
         if self._is_running:
             self._elapsed_seconds += dt
 
         if self._timer_label is not None:
-            total = int(self._elapsed_seconds)
-            minutes = total // 60
-            seconds = total % 60
-            prefix = self._ui_text("时长", "Time")
-            self._timer_label.text = f"{prefix}: {minutes:02d}:{seconds:02d}"
-
-        if self._fps_label is None:
-            return
-        self._fps_label.text = f"FPS: {Clock.get_fps():.1f}"
+            total_time = self._elapsed_seconds
+            minutes = int(total_time) // 60
+            seconds = int(total_time) % 60
+            milliseconds = int((total_time * 100) % 100)
+            self._timer_label.text = f"{minutes:02d}:{seconds:02d}.{milliseconds:02d}"
 
     def on_stop(self) -> None:
         if self._fps_event is not None:
