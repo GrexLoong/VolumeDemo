@@ -206,13 +206,13 @@ class MicrophoneSource:
 
     def _run(self) -> None:
         from jnius import autoclass
-        
+
         ByteBuffer = autoclass("java.nio.ByteBuffer")
         ByteOrder = autoclass("java.nio.ByteOrder")
-        
+
         chunk_size_samples = max(1, int(SAMPLE_RATE / self._sample_fps))
         buffer_capacity_bytes = chunk_size_samples * 2
-        
+
         # AudioRecord reads directly into a ByteBuffer reliably in Pyjnius without array copying bugs.
         # This resolves the issue where the out-parameter array gets lost, leading to 'straight line' zero values.
         direct_buffer = ByteBuffer.allocateDirect(buffer_capacity_bytes)
@@ -220,21 +220,21 @@ class MicrophoneSource:
 
         while self._running.is_set() and self._recorder is not None:
             direct_buffer.clear()
-            
+
             # API 23+ read signature matching (ByteBuffer, int)
             read_bytes = self._recorder.read(direct_buffer, buffer_capacity_bytes)
-            
+
             if read_bytes <= 0:
                 continue
 
             direct_buffer.rewind()
             acc = 0.0
             frames = read_bytes // 2
-            
+
             for _ in range(frames):
                 sample = float(direct_buffer.getShort())
                 acc += sample * sample
-                
+
             rms = math.sqrt(acc / max(1, frames))
             normalized = min(rms / MAX_EXPECTED_RMS, 1.0)
             self._amplitudes.append(normalized)
