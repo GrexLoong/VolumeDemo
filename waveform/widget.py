@@ -80,13 +80,14 @@ class WaveformWidget(Widget):
         self._bg_rect.pos = self.pos
         self._bg_rect.size = self.size
 
-        self._playhead_rect.pos = (self.right - self._playhead_width * 0.5, self.y)
+        # Place playhead strictly at the center of the widget for perfect stability
+        self._playhead_rect.pos = (self.center_x - self._playhead_width * 0.5, self.y)
         self._playhead_rect.size = (self._playhead_width, self.height)
 
         # Redraw all bars relative to the new layout directly using their absolute timeline offsets.
         center_y = self._container_center_y()
         for bar in self._bars:
-            screen_x = self.right - (self._viewport_x - bar.absolute_x)
+            screen_x = self.center_x - (self._viewport_x - bar.absolute_x)
             y = center_y - bar.height * 0.5
             bar.rect.pos = (screen_x, y)
 
@@ -135,7 +136,7 @@ class WaveformWidget(Widget):
         else:
             abs_x = self._viewport_x - width
 
-        screen_x = self.right - (self._viewport_x - abs_x)
+        screen_x = self.center_x - (self._viewport_x - abs_x)
         y = center_y - height * 0.5
         radius = width * 0.5
 
@@ -164,7 +165,7 @@ class WaveformWidget(Widget):
         alive: List[BarItem] = []
 
         for bar in self._bars:
-            screen_x = self.right - (self._viewport_x - bar.absolute_x)
+            screen_x = self.center_x - (self._viewport_x - bar.absolute_x)
 
             if screen_x + bar.width < self.x:
                 self.canvas.remove(bar.color)
@@ -190,6 +191,16 @@ class WaveformWidget(Widget):
         if self.height < self._container_min_height:
             self.size_hint_y = None
             self.height = self._container_min_height
+
+    def clear(self) -> None:
+        """Reset the waveform visualization completely for a new recording session."""
+        for bar in self._bars:
+            self.canvas.remove(bar.color)
+            self.canvas.remove(bar.rect)
+        self._bars.clear()
+        self._viewport_x = 0.0
+        self._spawn_accumulator = 0.0
+        self._amplitudes.clear()
 
     def update_frame(self, dt: float) -> None:
         self._ensure_container_hint()

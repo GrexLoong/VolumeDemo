@@ -205,18 +205,25 @@ class MicrophoneSource:
         self._recorder = None
 
     def _run(self) -> None:
+        from jnius import autoclass
+        Array = autoclass("java.lang.reflect.Array")
+        Short = autoclass("java.lang.Short")
+        
         chunk_size = max(1, int(SAMPLE_RATE / self._sample_fps))
-        pcm_buffer = array("h", [0] * chunk_size)
+        
+        # Pyjnius cannot mutate pure Python arrays when passed to Java out-parameters.
+        # We must explicitly create a Java short[] using reflection.
+        j_short_array = Array.newInstance(Short.TYPE, chunk_size)
 
         while self._running.is_set() and self._recorder is not None:
-            read_count = self._recorder.read(pcm_buffer, 0, chunk_size)
+            read_count = self._recorder.read(j_short_array, 0, chunk_size)
             if read_count <= 0:
                 continue
 
             # Calculate RMS from 16-bit PCM samples and normalize into [0, 1].
             acc = 0.0
             for i in range(read_count):
-                sample = float(pcm_buffer[i])
+                sample = float(Array.getShort(j_short_array, i))
                 acc += sample * sample
             rms = math.sqrt(acc / read_count)
             normalized = min(rms / MAX_EXPECTED_RMS, 1.0)

@@ -3,22 +3,22 @@
 from kivy.metrics import dp
 
 # Visual metrics.
-BAR_MIN_WIDTH_DP = 3.0
+BAR_MIN_WIDTH_DP = 4.0
 BAR_MAX_WIDTH_DP = 4.0
-BAR_GAP_DP = 6.0
-BAR_MIN_HEIGHT_DP = 12.0
-BAR_MAX_HEIGHT_DP = 58.0
-CONTAINER_MIN_HEIGHT_DP = 64.0
-CONTAINER_VERTICAL_PADDING_DP = 4.0
+BAR_GAP_DP = 4.0
+BAR_MIN_HEIGHT_DP = 4.0
+BAR_MAX_HEIGHT_DP = 64.0
+CONTAINER_MIN_HEIGHT_DP = 80.0
+CONTAINER_VERTICAL_PADDING_DP = 8.0
 
 # Animation and data rates.
 RENDER_FPS = 60.0
-BAR_SPAWN_FPS = 12.0
-SCROLL_SPEED_DP_PER_SEC = 114.0
+BAR_SPAWN_FPS = 45.0
+SCROLL_SPEED_DP_PER_SEC = (BAR_MAX_WIDTH_DP + BAR_GAP_DP) * BAR_SPAWN_FPS
 
 # Keep microphone analysis responsive while slowing mock visual feed.
-MIC_SAMPLE_FPS = 25.0
-MOCK_SAMPLE_FPS = 12.0
+MIC_SAMPLE_FPS = 45.0
+MOCK_SAMPLE_FPS = 45.0
 
 # Mock speech envelope (used only in desktop/testing mode).
 # Speaking and silence alternate to mimic real recording cadence.

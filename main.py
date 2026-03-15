@@ -264,6 +264,9 @@ class WaveformApp(App):
         if self._source is None or self._is_running:
             return
         self._elapsed_seconds = 0.0
+        if self._waveform:
+            self._waveform.clear()
+
         try:
             self._source.start()
         except Exception as e:
