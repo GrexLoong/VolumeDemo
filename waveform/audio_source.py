@@ -206,11 +206,12 @@ class MicrophoneSource:
 
     def _run(self) -> None:
         from jnius import autoclass
+
         Array = autoclass("java.lang.reflect.Array")
         Short = autoclass("java.lang.Short")
-        
+
         chunk_size = max(1, int(SAMPLE_RATE / self._sample_fps))
-        
+
         # Pyjnius cannot mutate pure Python arrays when passed to Java out-parameters.
         # We must explicitly create a Java short[] using reflection.
         j_short_array = Array.newInstance(Short.TYPE, chunk_size)
