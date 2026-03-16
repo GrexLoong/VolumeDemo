@@ -24,6 +24,7 @@ from waveform.constants import (
     FADE_OUT_WIDTH_DP,
     PLAYHEAD_RGBA,
     PLAYHEAD_WIDTH_DP,
+    PLAYHEAD_MARGIN_RIGHT_DP,
     RENDER_FPS,
     SCROLL_SPEED_DP_PER_SEC,
     to_dp,
@@ -63,6 +64,7 @@ class WaveformWidget(Widget):
         self._spawn_interval = 1.0 / BAR_SPAWN_FPS
         self._scroll_speed = to_dp(SCROLL_SPEED_DP_PER_SEC)
         self._playhead_width = to_dp(PLAYHEAD_WIDTH_DP)
+        self._playhead_margin_right = to_dp(PLAYHEAD_MARGIN_RIGHT_DP)
         self._fade_out_width = to_dp(FADE_OUT_WIDTH_DP)
 
         with self.canvas.before:
@@ -76,18 +78,21 @@ class WaveformWidget(Widget):
         self.bind(pos=self._on_layout_change, size=self._on_layout_change)
         Clock.schedule_interval(self.update_frame, 1.0 / RENDER_FPS)
 
+    def _get_playhead_x(self) -> float:
+        return self.right - self._playhead_margin_right
+
     def _on_layout_change(self, *_args) -> None:
         self._bg_rect.pos = self.pos
         self._bg_rect.size = self.size
 
-        # Place playhead strictly at the center of the widget for perfect stability
-        self._playhead_rect.pos = (self.center_x - self._playhead_width * 0.5, self.y)
+        playhead_x = self._get_playhead_x()
+        self._playhead_rect.pos = (playhead_x - self._playhead_width * 0.5, self.y)
         self._playhead_rect.size = (self._playhead_width, self.height)
 
         # Redraw all bars relative to the new layout directly using their absolute timeline offsets.
         center_y = self._container_center_y()
         for bar in self._bars:
-            screen_x = self.center_x - (self._viewport_x - bar.absolute_x)
+            screen_x = playhead_x - (self._viewport_x - bar.absolute_x)
             y = center_y - bar.height * 0.5
             bar.rect.pos = (screen_x, y)
 
@@ -136,7 +141,8 @@ class WaveformWidget(Widget):
         else:
             abs_x = self._viewport_x - width
 
-        screen_x = self.center_x - (self._viewport_x - abs_x)
+        playhead_x = self._get_playhead_x()
+        screen_x = playhead_x - (self._viewport_x - abs_x)
         y = center_y - height * 0.5
         radius = width * 0.5
 
@@ -163,9 +169,10 @@ class WaveformWidget(Widget):
         center_y = self._container_center_y()
         fade_start_x = self.x + self._fade_out_width
         alive: List[BarItem] = []
+        playhead_x = self._get_playhead_x()
 
         for bar in self._bars:
-            screen_x = self.center_x - (self._viewport_x - bar.absolute_x)
+            screen_x = playhead_x - (self._viewport_x - bar.absolute_x)
 
             if screen_x + bar.width < self.x:
                 self.canvas.remove(bar.color)

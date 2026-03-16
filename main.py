@@ -221,7 +221,7 @@ class WaveformApp(App):
         root = FloatLayout()
 
         # High contrast, large timer label at the top.
-        from waveform.constants import TIMER_FONT_SIZE_DP
+        from waveform.constants import TIMER_FONT_SIZE_DP, CONTAINER_MIN_HEIGHT_DP
 
         self._timer_label = Label(
             text="00:00.00",
@@ -238,7 +238,7 @@ class WaveformApp(App):
         wave_container = BoxLayout(
             orientation="vertical",
             size_hint=(1.0, None),
-            height=dp(200),
+            height=dp(CONTAINER_MIN_HEIGHT_DP),
             pos_hint={"center_x": 0.5, "center_y": 0.55},
         )
         wave_container.add_widget(self._waveform)
